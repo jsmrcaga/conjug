@@ -42,14 +42,17 @@ function getVerb(index){
 			var $ = cheerio.load(res);
 			var conjug = $('.conjug');
 
-			for(var i = 0; i <7; i++){
+			var con_counter = 0
+			for(var i = 0; i < 7; i++){
 				for(var j = 0; j < 6; j++){
-					if(!conjug[j] || !conjug[j].firstChild){
+					if(!conjug[con_counter] || !conjug[con_counter].firstChild){
+						con_counter++;
 						continue;
 					}
-					var conjug = conjug[j].firstChild.data + conjug[j].firstChild.next.firstChild.data;
-					console.log('Adding', conjug, '...');
-					insertConjug(reg.exec(conjug)[1], id, personnes[j], times[i]);
+					var conjugated = conjug[con_counter].firstChild.data + conjug[con_counter].firstChild.next.firstChild.data;
+					console.log('Adding', conjugated, '...');
+					con_counter++;
+					insertConjug(reg.exec(conjugated)[1], id, personnes[j], times[i]);
 				}
 			}
 

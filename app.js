@@ -23,6 +23,7 @@ function getVerb(index){
 	if(!verbs[index]){
 		connection.end();
 		console.log('Done');
+		return;
 	}
 
 	if(verbs[index].indexOf('-')>-1 || verbs[index].indexOf("'")>-1){
@@ -49,7 +50,11 @@ function getVerb(index){
 						con_counter++;
 						continue;
 					}
-					var conjugated = conjug[con_counter].firstChild.data + conjug[con_counter].firstChild.next.firstChild.data;
+					var second = '';
+					try{
+						second = conjug[con_counter].firstChild.next.firstChild.data;
+					} catch(e) {}
+					var conjugated = conjug[con_counter].firstChild.data + second;
 					console.log('Adding', conjugated, '...');
 					con_counter++;
 					insertConjug(reg.exec(conjugated)[1], id, personnes[j], times[i]);

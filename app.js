@@ -1,95 +1,155 @@
+var express = require('express');
+var app = express();
 var fs = require('fs');
-var verbs = JSON.parse(fs.readFileSync('./data.json'));
 
-var fishingrod = require('fishingrod');
+var conf = JSON.parse(fs.readFileSync('./conf.json'));
+
+var bodyParser = require('body-parser');
+var cors = require('cors');
+app.use(cors());
+
+app.options('*', cors());
+
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+
+var mustache = require('mustache-express');
+app.engine('html', mustache());
+app.set('view engine', 'html');
+
+app.set('views', __dirname+'/views');
+app.use(express.static(__dirname+'/views/public'));
 
 var mysql = require('mysql');
-var connection = mysql.createConnection({
-	host: 'localhost',
-	user:'root',
-	password: 'phantomoftheopera',
-	database: 'conjugation'
+var connection = mysql.createPool({
+	connectionLimit: 5,
+	host: conf.db.host,
+	user: conf.db.username,
+	password: conf.db.password,
+	database: conf.db.database
 });
 
-connection.connect();
+var APPLICATIONS = [{
+	type: 'full',
+	key: conf.full_key
+}];
 
-var cheerio = require('cheerio');
-var times = ['indicatif', 'futur', 'imparfait', 'passe-simple','sub-pres', 'sub-imparfait', 'conditionnel', 'imperatif']
-var personnes = ['je', 'tu', 'il/elle', 'nous', 'vous', 'ils'];
-
-var reg = /([^\s']*)$/i;
-
-function getVerb(index){
-	if(!verbs[index]){
-		connection.end();
-		console.log('Done');
-		return;
+app.use('/', function(req, res, next){
+	if(req.path === '/dump'){
+		return next();
 	}
 
-	if(verbs[index].indexOf('-')>-1 || verbs[index].indexOf("'")>-1){
-		console.error('Ignoring', verbs['index']);
-		getVerb(index+1);
-		return;
+	if(!('app_key' in req.body)){
+		return res.sendStatus(404);
 	}
 
-	console.log('Inserting verb', verbs[index]);
-	insertVerb(index, function(id, v_index){
-		fishingrod.fish({
-			https: false,
-			host: 'conjugateur.fr',
-			path: `/conjuguer-verbe-${verbs[v_index]}`,
-			method: 'GET'
-		}, function(st, res){
-			var $ = cheerio.load(res);
-			var conjug = $('.conjug');
+	// verify app_key
+	var app = APPLICATIONS.findObjectByProperty('key', req.body.app_key);
 
-			var con_counter = 0
-			for(var i = 0; i < 7; i++){
-				for(var j = 0; j < 6; j++){
-					if(!conjug[con_counter] || !conjug[con_counter].firstChild){
-						con_counter++;
-						continue;
-					}
-					var second = '';
-					try{
-						second = conjug[con_counter].firstChild.next.firstChild.data;
-					} catch(e) {}
-					var conjugated = conjug[con_counter].firstChild.data + second;
-					console.log('Adding', conjugated, '...');
-					con_counter++;
-					insertConjug(reg.exec(conjugated)[1], id, personnes[j], times[i]);
-				}
+	if(!app){
+		return res.sendStatus(404);
+	}
+	req.application = app;
+	return next();
+});
+
+app.use('/api', function(req, res, err){
+	if(req.application.type !== 'full'){
+		return res.sendStatus(404);
+	}
+
+	next();
+});
+
+app.get('/conjugate/:verb', function (req, res, err){
+	var query = 'SELECT * FROM `conjugated` WHERE word_id IN (SELECT id FROM `radical` WHERE radical=?)'
+	connection.query(query, [req.params.verb], function(err, rows, fields){
+		if(err){
+			return res.status(500).json({error:{message:`Error requesting conjugations for verb ${req.params.verb}`}, code:500});
+		}
+
+		var res = {
+			verb : req.params.verb,
+			conjugations :{
+
+			}
+		};
+
+		for(var el in rows){
+			if(!(el.time in res.conjugations)){
+				res.conjugations[el.time] = {};
 			}
 
-			continueparsing(v_index);
+			res.conjugations[el.time][el.person] = el.conjugation;
+		}
 
+		return res.json(res);
+	});
+});
+
+app.get('/radicalize/:conjugated_verb', function(req, res, err){
+	var query = 'SELECT RA.* FROM radical RA left join conjugated CO on CO.word_id = RA.id where CO.conjugation=?';
+	connection.query(query, [req.params.conjugated_verb], function(err ,rows, fields){
+		if(err){
+			return res.status(500).json({error:{message:`Error requesting radical for verb ${req.params.conjugated_verb}`}, code:500});
+		}
+
+		return res.status(200).json({
+			conjugated: req.params.conjugated_verb,
+			radical: rows[0].radical
 		});
 	});
-}
+});
 
-function continueparsing(v_index){
-	getVerb(v_index+1);
-}
+app.get('/dump', function(req, res, err){
+	return res.set('Content-Disposition', 'attachment; filename=./conjugation_fr_dump.sql').sendStatus(200);
+});
 
-function insertVerb(index, callback){
-	var query = 'INSERT INTO radical VALUES(null, ?);';
-	connection.query(query, [verbs[index]], function(err, rows, fields){
-		if(err){
-			return console.error('Error inserting verb', err);
-		}
-		callback(rows.insertId, index);
+app.get('/api/reload', function (req, res, err) {
+	reloadApps();
+	res.sendStatus(204);
+});
+
+app.post('/api/app', function(req, res, err){
+	if(!('type' in req.body)){
+		res.sendStatus(400);
+	}
+
+	var key = genUUID(); 
+
+	APPLICATIONS.push({
+		type: req.body.type,
+		key: key
 	});
+
+	fs.writeFileSinc('./applications.json', JSON.stringify(APPLICATIONS));
+	res.status(200).send(key);
+})
+
+function reloadApps(){
+	APPLICATIONS = JSON.parse(fs.readFileSync('./applications.json'));
 }
 
-function insertConjug(conjug, verb_id, person, time){
-	var query = 'INSERT INTO conjugated VALUES(null, ?, ?, ?, ?)';
-	connection.query(query, [verb_id, conjug, person, time], function(err, rows, fields){
-		if(err){
-			return console.error(err);
+function genUUID(){
+	function s4(){
+		return (Math.floor((1+Math.random()) * 0x10000)).toString(16).substring(1);
+	}
+
+	return `${s4()}${s4()}-${s4()}-${s4()}-${s4()}-${s4()}${s4()}${s4()}`;
+}
+
+Object.defineProperty(Array.prototype, 'findObjectByProperty', {
+	enumerable: false,
+	value: function(prop, val){
+		for(var el of this){
+			if(el[prop] && el[prop] === val){
+				return el;
+			}
 		}
+		return null;
+	}	
+});
 
-		console.log('SUCCESSFULLY ADDED', conjug);
-	})
-}
-
-getVerb(0);
+app.listen(1234, function(){
+	console.log(`Server listening on port ${1234}!`);
+});

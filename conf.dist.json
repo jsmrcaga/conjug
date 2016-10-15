@@ -1,0 +1,10 @@
+{
+	"db":{
+		"host": "",
+		"user":"",
+		"database":"",
+		"password":""
+	},
+
+	"full_key":"" 
+}

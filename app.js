@@ -43,28 +43,30 @@ app.use('/api', function(req, res, err){
 });
 
 app.get('/conjugate/:verb', function (req, res, err){
-	var query = 'SELECT * FROM `conjugated` WHERE word_id IN (SELECT id FROM `radical` WHERE radical=?)'
+	var query = 'SELECT * FROM `conjugated` WHERE word_id IN (SELECT id FROM `radical` WHERE radical=?)';
+
 	connection.query(query, [req.params.verb], function(err, rows, fields){
 		if(err){
+			console.error(err);
 			return res.status(500).json({error:{message:`Error requesting conjugations for verb ${req.params.verb}`}, code:500});
 		}
 
-		var res = {
+		var resp = {
 			verb : req.params.verb,
 			conjugations :{
 
 			}
 		};
 
-		for(var el in rows){
-			if(!(el.time in res.conjugations)){
-				res.conjugations[el.time] = {};
+		for(var el of rows){
+			if(!(el.time in resp.conjugations)){
+				resp.conjugations[el.time] = {};
 			}
 
-			res.conjugations[el.time][el.person] = el.conjugation;
+			resp.conjugations[el.time][el.person] = el.conjugation;
 		}
 
-		return res.json(res);
+		return res.json(resp);
 	});
 });
 
@@ -72,6 +74,7 @@ app.get('/radicalize/:conjugated_verb', function(req, res, err){
 	var query = 'SELECT RA.* FROM radical RA left join conjugated CO on CO.word_id = RA.id where CO.conjugation=?';
 	connection.query(query, [req.params.conjugated_verb], function(err ,rows, fields){
 		if(err){
+			console.error(err);
 			return res.status(500).json({error:{message:`Error requesting radical for verb ${req.params.conjugated_verb}`}, code:500});
 		}
 
@@ -83,7 +86,24 @@ app.get('/radicalize/:conjugated_verb', function(req, res, err){
 });
 
 app.get('/dump', function(req, res, err){
-	return res.set('Content-Disposition', 'attachment; filename=./conjugation_fr_dump.sql').sendStatus(200);
+	var options = {
+		root: __dirname,
+		dotfiles: 'deny',
+		headers: {
+			'x-timestamp': Date.now(),
+			'x-sent': true
+		}
+	};
+
+	var fileName = req.params.name;
+	res.sendFile('conjugation_fr_dump.sql', options, function (err) {
+		if (err) {
+			console.log(err);
+			res.status(err.status).end();
+		} else {
+			console.log('Sent:', fileName);
+		}
+	});
 });
 
 app.get('/api/reload', function (req, res, err) {

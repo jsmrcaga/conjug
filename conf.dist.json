@@ -1,7 +1,7 @@
 {
 	"db":{
 		"host": "",
-		"user":"",
+		"username":"",
 		"database":"",
 		"password":""
 	},

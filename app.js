@@ -73,7 +73,7 @@ app.get('/conjugate/:verb', function (req, res, err){
 app.get('/radicalize/:conjugated_verb', function(req, res, err){
 	var query = 'SELECT RA.* FROM radical RA left join conjugated CO on CO.word_id = RA.id where CO.conjugation=?';
 	connection.query(query, [req.params.conjugated_verb], function(err ,rows, fields){
-		if(err){
+		if(err || !rows[0]){
 			console.error(err);
 			return res.status(500).json({error:{message:`Error requesting radical for verb ${req.params.conjugated_verb}`}, code:500});
 		}
@@ -91,7 +91,8 @@ app.get('/dump', function(req, res, err){
 		dotfiles: 'deny',
 		headers: {
 			'x-timestamp': Date.now(),
-			'x-sent': true
+			'x-sent': true,
+			'Content-Disposition': 'attachment; filename=conjugation_fr_dump.sql'
 		}
 	};
 

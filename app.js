@@ -34,25 +34,6 @@ var APPLICATIONS = [{
 	key: conf.full_key
 }];
 
-app.use('/', function(req, res, next){
-	if(req.path === '/dump'){
-		return next();
-	}
-
-	if(!('app_key' in req.body)){
-		return res.sendStatus(404);
-	}
-
-	// verify app_key
-	var app = APPLICATIONS.findObjectByProperty('key', req.body.app_key);
-
-	if(!app){
-		return res.sendStatus(404);
-	}
-	req.application = app;
-	return next();
-});
-
 app.use('/api', function(req, res, err){
 	if(req.application.type !== 'full'){
 		return res.sendStatus(404);

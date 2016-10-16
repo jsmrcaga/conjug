@@ -86,8 +86,13 @@ app.get('/radicalize/:conjugated_verb', function(req, res, err){
 			resp.radical = rows[0].radical
 		} else {
 			resp.radicals = [];
-			for(var r of row){
+			var seen_ids = [];
+			for(var r of rows){
+				if(seend_ids.indexOf(r.id) > -1){
+					continue;
+				}
 				resp.radicals.push(r.radical);
+				seend_ids.push(r.id);
 			}
 		}
 
@@ -162,6 +167,6 @@ Object.defineProperty(Array.prototype, 'findObjectByProperty', {
 	}	
 });
 
-app.listen(1234, function(){
-	console.log(`Server listening on port ${1234}!`);
+app.listen(3500, function(){
+	console.log(`Server listening on port ${3500}!`);
 });

@@ -78,10 +78,20 @@ app.get('/radicalize/:conjugated_verb', function(req, res, err){
 			return res.status(500).json({error:{message:`Error requesting radical for verb ${req.params.conjugated_verb}`}, code:500});
 		}
 
-		return res.status(200).json({
+		var resp = {
 			conjugated: req.params.conjugated_verb,
-			radical: rows[0].radical
-		});
+		};
+
+		if(rows.length === 1){
+			resp.radical = rows[0].radical
+		} else {
+			resp.radicals = [];
+			for(var r of row){
+				resp.radicals.push(r.radical);
+			}
+		}
+
+		return res.status(200).json(resp);
 	});
 });
 

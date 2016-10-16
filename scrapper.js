@@ -1,4 +1,6 @@
 var fs = require('fs');
+var diacritics = require('diacritics');
+
 var verbs = JSON.parse(fs.readFileSync('./data.json'));
 
 var conf = JSON.parse(fs.readFileSync('./conf.json'));
@@ -39,7 +41,7 @@ function getVerb(index){
 		fishingrod.fish({
 			https: false,
 			host: 'conjugateur.fr',
-			path: `/conjuguer-verbe-${verbs[v_index]}`,
+			path: `/conjuguer-verbe-${diacritics.remove(verbs[v_index])}`,
 			method: 'GET'
 		}, function(st, res){
 			var $ = cheerio.load(res);

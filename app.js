@@ -83,36 +83,38 @@ app.post('/radicalize', function(req, res, err){
 
 	for(var conjug of req.body.conjugations){
 		var query = 'SELECT DISTINCT RA.* FROM radical RA left join conjugated CO on CO.word_id = RA.id where CO.conjugation=?';
-		connection.query(query, conjug, function(err ,rows, fields){
-			if(err || !rows[0]){
-				console.error(err);
-				return;
-			}
+		connection.query(query, conjug, (function(conjug){
+			return function(err ,rows, fields){
+				if(err){
+					console.error(err, rows);
+					counter--;
+					return;
+				}
 
-			if(rows.length === 1){
-				result[conjug] = rows[0].radical
-			} else {
-				result[conjug] = [];
-				var seen_ids = [];
-				for(var r of rows){
-					if(seen_ids.indexOf(r.id) > -1){
-						continue;
+				if(rows.length === 0){
+					result[conjug] = false;
+				} else if(rows.length === 1) {
+					result[conjug] = rows[0].radical
+				} else {
+					result[conjug] = [];
+					var seen_ids = [];
+					for(var r of rows){
+						if(seen_ids.indexOf(r.id) > -1){
+							continue;
+						}
+						result[conjug].push(r.radical);
+						seen_ids.push(r.id);
 					}
-					result[conjug].push(r.radical);
-					seen_ids.push(r.id);
+				}
+
+				counter--;
+				if(counter == 0){
+					return res.status(200).json(result);
+					
 				}
 			}
-
-			counter--;
-			if(counter == 0){
-				return res.status(200).json(result);
-				
-			}
-
-		});	
+		})(conjug));	
 	}
-	
-
 });
 
 app.get('/radicalize/:conjugated_verb', function(req, res, err){

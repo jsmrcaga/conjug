@@ -76,35 +76,42 @@ app.post('/radicalize', function(req, res, err){
 	}
 
 	var result = {
-		conjugations: req.params.conjugations,
+		conjugations: req.body.conjugations,
 	};
 
-	for(var conjug of conjugations){
+	var counter = req.body.conjugations.length;
+
+	for(var conjug of req.body.conjugations){
 		var query = 'SELECT DISTINCT RA.* FROM radical RA left join conjugated CO on CO.word_id = RA.id where CO.conjugation=?';
 		connection.query(query, conjug, function(err ,rows, fields){
 			if(err || !rows[0]){
 				console.error(err);
-				return res.status(500).json({error:{message:`Error requesting radical for verbs ${req.body.conjugations.join(', ')}`}, code:500});
+				return;
 			}
 
 			if(rows.length === 1){
-				resp.[conjug] = rows[0].radical
+				result[conjug] = rows[0].radical
 			} else {
-				resp[conjug] = [];
+				result[conjug] = [];
 				var seen_ids = [];
 				for(var r of rows){
 					if(seen_ids.indexOf(r.id) > -1){
 						continue;
 					}
-					resp[conjug].push(r.radical);
+					result[conjug].push(r.radical);
 					seen_ids.push(r.id);
 				}
+			}
+
+			counter--;
+			if(counter == 0){
+				return res.status(200).json(result);
+				
 			}
 
 		});	
 	}
 	
-	return res.status(200).json(resp);
 
 });
 

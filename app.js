@@ -70,8 +70,42 @@ app.get('/conjugate/:verb', function (req, res, err){
 	});
 });
 
+app.post('/radicalize', function(req, res, err){
+	if(!('conjugations' in req.body) || (!req.body.conjugations)){
+		return res.sendStatus(400);
+	}
+
+	var query = 'SELECT DISTINCT RA.* FROM radical RA left join conjugated CO on CO.word_id = RA.id where CO.conjugation IN (' + req.body.conjugations.join(',') + ');';
+	connection.query(query, function(err ,rows, fields){
+		if(err || !rows[0]){
+			console.error(err);
+			return res.status(500).json({error:{message:`Error requesting radical for verbs ${req.body.conjugations.join(', ')}`}, code:500});
+		}
+
+		var resp = {
+			conjugated: req.params.conjugations,
+		};
+
+		if(rows.length === 1){
+			resp.radical = rows[0].radical
+		} else {
+			resp.radicals = [];
+			var seen_ids = [];
+			for(var r of rows){
+				if(seen_ids.indexOf(r.id) > -1){
+					continue;
+				}
+				resp.radicals.push(r.radical);
+				seen_ids.push(r.id);
+			}
+		}
+
+		return res.status(200).json(resp);
+	});	
+});
+
 app.get('/radicalize/:conjugated_verb', function(req, res, err){
-	var query = 'SELECT RA.* FROM radical RA left join conjugated CO on CO.word_id = RA.id where CO.conjugation=?';
+	var query = 'SELECT DISTINCT RA.* FROM radical RA left join conjugated CO on CO.word_id = RA.id where CO.conjugation=?';
 	connection.query(query, [req.params.conjugated_verb], function(err ,rows, fields){
 		if(err || !rows[0]){
 			console.error(err);
@@ -88,11 +122,11 @@ app.get('/radicalize/:conjugated_verb', function(req, res, err){
 			resp.radicals = [];
 			var seen_ids = [];
 			for(var r of rows){
-				if(seend_ids.indexOf(r.id) > -1){
+				if(seen_ids.indexOf(r.id) > -1){
 					continue;
 				}
 				resp.radicals.push(r.radical);
-				seend_ids.push(r.id);
+				seen_ids.push(r.id);
 			}
 		}
 

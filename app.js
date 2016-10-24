@@ -117,6 +117,41 @@ app.post('/radicalize', function(req, res, err){
 	}
 });
 
+app.post('/radicalize/replace', function(req, res, err){
+	if(!('conjugations' in req.body) || (!req.body.conjugations)){
+		return res.sendStatus(400);
+	}
+
+	var result = [];
+
+	var counter = req.body.conjugations.length;
+
+	for(var conjug of req.body.conjugations){
+		var query = 'SELECT DISTINCT RA.* FROM radical RA left join conjugated CO on CO.word_id = RA.id where CO.conjugation=?';
+		connection.query(query, conjug, (function(conjug){
+			return function(err ,rows, fields){
+				if(err){
+					console.error(err, rows);
+					counter--;
+					return;
+				}
+
+				if(rows.length === 0){
+					result.push(conjug);
+				} else if(rows.length === 1) {
+					result.pus(rows[0].radical);
+				}
+
+				counter--;
+				if(counter == 0){
+					return res.status(200).json(result);
+					
+				}
+			}
+		})(conjug));	
+	}
+});
+
 app.get('/radicalize/:conjugated_verb', function(req, res, err){
 	var query = 'SELECT DISTINCT RA.* FROM radical RA left join conjugated CO on CO.word_id = RA.id where CO.conjugation=?';
 	connection.query(query, [req.params.conjugated_verb], function(err ,rows, fields){

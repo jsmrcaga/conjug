@@ -124,32 +124,25 @@ app.post('/radicalize/replace', function(req, res, err){
 
 	var result = [];
 
-	var counter = req.body.conjugations.length;
+	var query = 'SELECT DISTINCT RA.*, CO.conjugation as word FROM conjugated CO left join radical RA on CO.word_id = RA.id where CO.conjugation IN (??);';
+	connection.query(query, req.body.conjugations, (function(conjug){
+		return function(err ,rows, fields){
+			if(err){
+				console.error(err, rows);
+				return;
+			}
 
-	for(var conjug of req.body.conjugations){
-		var query = 'SELECT DISTINCT RA.* FROM radical RA left join conjugated CO on CO.word_id = RA.id where CO.conjugation=?';
-		connection.query(query, conjug, (function(conjug){
-			return function(err ,rows, fields){
-				if(err){
-					console.error(err, rows);
-					counter--;
-					return;
-				}
-
-				if(rows.length === 0){
-					result.push(conjug);
-				} else if(rows.length === 1) {
-					result.pus(rows[0].radical);
-				}
-
-				counter--;
-				if(counter == 0){
-					return res.status(200).json(result);
-					
+			for(var row of rows){
+				var i = req.body.conjugations.indexOf(row.word);
+				if(i > -1){
+					req.body.conjugations[i] = row.radical;
 				}
 			}
-		})(conjug));	
-	}
+
+			return res.status(200).json(req.body.conjugations);	
+		}
+	})(conjug));	
+	
 });
 
 app.get('/radicalize/:conjugated_verb', function(req, res, err){
